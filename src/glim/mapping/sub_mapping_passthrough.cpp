@@ -1,4 +1,4 @@
-#include <glim/mapping/sub_mapping_passthrough.hpp>
+  #include <glim/mapping/sub_mapping_passthrough.hpp>
 
 #include <spdlog/spdlog.h>
 #include <gtsam_points/types/point_cloud_cpu.hpp>

@@ -40,7 +40,7 @@ endif()
 # GPU-related
 if(BUILD_WITH_CUDA)
   add_definitions(-DBUILD_GTSAM_POINTS_GPU)
-  set(GPU_SRCS src/glim/odometry/odometry_estimation_gpu.cpp)
+  set(GPU_SRCS src/glim/odometry/odometry_estimation_gpu.cpp )
 endif()
 
 add_library(glim SHARED
@@ -69,6 +69,7 @@ add_library(glim SHARED
   src/glim/odometry/odometry_estimation_imu.cpp
   src/glim/odometry/odometry_estimation_ct.cpp
   src/glim/odometry/odometry_estimation_cpu.cpp
+#        src/glim/odometry/odometry_estimation_gazel.cpp
   # mapping
   src/glim/mapping/callbacks.cpp
   src/glim/mapping/sub_map.cpp
@@ -80,6 +81,7 @@ add_library(glim SHARED
   src/glim/mapping/sub_mapping_passthrough.cpp
   src/glim/mapping/global_mapping.cpp
   src/glim/mapping/global_mapping_pose_graph.cpp
+
   # GPU-related
   ${GPU_SRCS}
 )
@@ -115,6 +117,9 @@ if(BUILD_WITH_CUDA)
   list(APPEND module_srcs
     src/glim/odometry/odometry_estimation_gpu_create.cpp
   )
+#  list(APPEND module_srcs
+#          src/glim/odometry/odometry_estimation_gpu_gazel_create.cpp
+#  )
 endif()
 
 foreach(module_src IN LISTS module_srcs)

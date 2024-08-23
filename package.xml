@@ -9,7 +9,8 @@
 
   <depend>fmt</depend>
   <depend>spdlog</depend>
-
+  <depend>gtsam_points</depend>
+<depend>iridescence</depend>
   <buildtool_depend condition="$ROS_VERSION == 1">catkin</buildtool_depend>
   <buildtool_depend condition="$ROS_VERSION == 2">ament_cmake</buildtool_depend>
 

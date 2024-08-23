@@ -1,4 +1,4 @@
-#include <glim/odometry/odometry_estimation_gpu.hpp>
+#include <glim/odometry/odometry_estimation_gpu_gazel.hpp>
 
 #include <spdlog/spdlog.h>
 
@@ -20,7 +20,7 @@
 #include <gtsam_points/cuda/nonlinear_factor_set_gpu.hpp>
 
 #include <glim/util/config.hpp>
-//#include <glim/common/imu_integration.hpp>
+#include <glim/common/imu_integration.hpp>
 //#include <glim/common/cloud_deskewing.hpp>
 #include <glim/common/cloud_covariance_estimation.hpp>
 
@@ -34,7 +34,7 @@ using Callbacks = OdometryEstimationCallbacks;
 // using gtsam::symbol_shorthand::V;  // IMU velocity   (v_world_imu)
 using gtsam::symbol_shorthand::X;  // IMU pose       (T_world_imu)
 
-OdometryEstimationGPUParams::OdometryEstimationGPUParams() : OdometryEstimationIMUParams() {
+OdometryEstimationGPUGazelParams::OdometryEstimationGPUGazelParams() : OdometryEstimationGazelParams() {
   // odometry config
   Config config(GlobalConfig::get_config_path("config_odometry"));
 
@@ -63,9 +63,9 @@ OdometryEstimationGPUParams::OdometryEstimationGPUParams() : OdometryEstimationI
   keyframe_entropy_thresh = config.param<double>("odometry_estimation", "keyframe_entropy_thresh", 0.99);
 }
 
-OdometryEstimationGPUParams::~OdometryEstimationGPUParams() {}
+OdometryEstimationGPUGazelParams::~OdometryEstimationGPUGazelParams() {}
 
-OdometryEstimationGPU::OdometryEstimationGPU(const OdometryEstimationGPUParams& params) : OdometryEstimationIMU(std::make_unique<OdometryEstimationGPUParams>(params)) {
+OdometryEstimationGPUGazel::OdometryEstimationGPUGazel(const OdometryEstimationGPUGazelParams& params) : OdometryEstimationGazel(std::make_unique<OdometryEstimationGPUGazelParams>(params)) {
   entropy_num_frames = 0;
   entropy_running_average = 0.0;
   marginalized_cursor = 0;
@@ -74,14 +74,14 @@ OdometryEstimationGPU::OdometryEstimationGPU(const OdometryEstimationGPUParams& 
   stream_buffer_roundrobin.reset(new gtsam_points::StreamTempBufferRoundRobin());
 }
 
-OdometryEstimationGPU::~OdometryEstimationGPU() {
+OdometryEstimationGPUGazel::~OdometryEstimationGPUGazel() {
   frames.clear();
   keyframes.clear();
   smoother.reset();
 }
 
-void OdometryEstimationGPU::create_frame(EstimationFrame::Ptr& new_frame) {
-  const auto params = static_cast<OdometryEstimationGPUParams*>(this->params.get());
+void OdometryEstimationGPUGazel::create_frame(EstimationFrame::Ptr& new_frame) {
+  const auto params = static_cast<OdometryEstimationGPUGazelParams*>(this->params.get());
 
   new_frame->frame = gtsam_points::PointCloudGPU::clone(*new_frame->frame);
   for (int i = 0; i < params->voxelmap_levels; i++) {
@@ -96,18 +96,18 @@ void OdometryEstimationGPU::create_frame(EstimationFrame::Ptr& new_frame) {
   }
 }
 
-void OdometryEstimationGPU::update_frames(const int current, const gtsam::NonlinearFactorGraph& new_factors) {
-  OdometryEstimationIMU::update_frames(current, new_factors);
+void OdometryEstimationGPUGazel::update_frames(const int current, const gtsam::NonlinearFactorGraph& new_factors) {
+  OdometryEstimationGazel::update_frames(current, new_factors);
 
-  const auto params = static_cast<OdometryEstimationGPUParams*>(this->params.get());
+  const auto params = static_cast<OdometryEstimationGPUGazelParams*>(this->params.get());
   switch (params->keyframe_strategy) {
-    case OdometryEstimationGPUParams::KeyframeUpdateStrategy::OVERLAP:
+    case OdometryEstimationGPUGazelParams::KeyframeUpdateStrategy::OVERLAP:
       update_keyframes_overlap(current);
       break;
-    case OdometryEstimationGPUParams::KeyframeUpdateStrategy::DISPLACEMENT:
+    case OdometryEstimationGPUGazelParams::KeyframeUpdateStrategy::DISPLACEMENT:
       update_keyframes_displacement(current);
       break;
-    case OdometryEstimationGPUParams::KeyframeUpdateStrategy::ENTROPY:
+    case OdometryEstimationGPUGazelParams::KeyframeUpdateStrategy::ENTROPY:
       update_keyframes_entropy(new_factors, current);
       break;
   }
@@ -115,7 +115,7 @@ void OdometryEstimationGPU::update_frames(const int current, const gtsam::Nonlin
   Callbacks::on_update_keyframes(keyframes);
 }
 
-gtsam::NonlinearFactorGraph OdometryEstimationGPU::create_factors(const int current, const boost::shared_ptr<gtsam::ImuFactor>& imu_factor, gtsam::Values& new_values) {
+gtsam::NonlinearFactorGraph OdometryEstimationGPUGazel::create_factors(const int current, gtsam::Values& new_values) {
   if (current == 0 || !frames[current]->frame->size()) {
     return gtsam::NonlinearFactorGraph();
   }
@@ -154,7 +154,7 @@ gtsam::NonlinearFactorGraph OdometryEstimationGPU::create_factors(const int curr
     }
   };
 
-  const auto params = static_cast<OdometryEstimationGPUParams*>(this->params.get());
+  const auto params = static_cast<OdometryEstimationGPUGazelParams*>(this->params.get());
 
   gtsam::NonlinearFactorGraph factors;
   if (current == 0) {
@@ -199,8 +199,8 @@ gtsam::NonlinearFactorGraph OdometryEstimationGPU::create_factors(const int curr
  * @brief Keyframe management based on an overlap metric
  * @ref   Koide et al., "Globally Consistent and Tightly Coupled 3D LiDAR Inertial Mapping", ICRA2022
  */
-void OdometryEstimationGPU::update_keyframes_overlap(int current) {
-  const auto params = static_cast<OdometryEstimationGPUParams*>(this->params.get());
+void OdometryEstimationGPUGazel::update_keyframes_overlap(int current) {
+  const auto params = static_cast<OdometryEstimationGPUGazelParams*>(this->params.get());
 
   if (!frames[current]->frame->size()) {
     return;
@@ -288,8 +288,8 @@ void OdometryEstimationGPU::update_keyframes_overlap(int current) {
  * @brief Keyframe management based on displacement criteria
  * @ref   Engel et al., "Direct Sparse Odometry", IEEE Trans. PAMI, 2018
  */
-void OdometryEstimationGPU::update_keyframes_displacement(int current) {
-  const auto params = static_cast<OdometryEstimationGPUParams*>(this->params.get());
+void OdometryEstimationGPUGazel::update_keyframes_displacement(int current) {
+  const auto params = static_cast<OdometryEstimationGPUGazelParams*>(this->params.get());
 
   if (keyframes.empty()) {
     keyframes.push_back(frames[current]);
@@ -355,8 +355,8 @@ void OdometryEstimationGPU::update_keyframes_displacement(int current) {
  * @brief Keyframe management based on entropy measure
  * @ref   Kuo et al., "Redesigning SLAM for Arbitrary Multi-Camera Systems", ICRA2020
  */
-void OdometryEstimationGPU::update_keyframes_entropy(const gtsam::NonlinearFactorGraph& matching_cost_factors, int current) {
-  const auto params = static_cast<OdometryEstimationGPUParams*>(this->params.get());
+void OdometryEstimationGPUGazel::update_keyframes_entropy(const gtsam::NonlinearFactorGraph& matching_cost_factors, int current) {
+  const auto params = static_cast<OdometryEstimationGPUGazelParams*>(this->params.get());
 
   gtsam::Values values = smoother->calculateEstimate();
 
