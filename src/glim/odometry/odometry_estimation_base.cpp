@@ -14,6 +14,12 @@ void OdometryEstimationBase::insert_image(const double stamp, const cv::Mat& ima
   Callbacks::on_insert_image(stamp, image);
 }
 
+void OdometryEstimationBase::insert_gkv(const double stamp, const gtsam::Pose3& pose, const gtsam::Matrix66& cov) {
+  // Callbacks::on_insert_image(stamp, image);
+  std::cout << "empty insert_gkv" << std::endl;
+}
+
+
 void OdometryEstimationBase::insert_imu(const double stamp, const Eigen::Vector3d& linear_acc, const Eigen::Vector3d& angular_vel) {
   Callbacks::on_insert_imu(stamp, linear_acc, angular_vel);
 }

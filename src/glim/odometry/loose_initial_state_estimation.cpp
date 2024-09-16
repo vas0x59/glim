@@ -119,6 +119,8 @@ EstimationFrame::ConstPtr LooseInitialStateEstimation::initial_pose() {
 
   graph.emplace_shared<gtsam_points::LinearDampingFactor>(X(0), (gtsam::Vector6() << 0.0, 0.0, 1.0, 0.0, 0.0, 0.0).finished() * 1e6);
   graph.emplace_shared<gtsam::PoseTranslationPrior<gtsam::Pose3>>(X(0), gtsam::Vector3::Zero(), gtsam::noiseModel::Isotropic::Precision(3, 1e3));
+  // graph.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(X(0), initial_pose, gtsam::noiseModel::Isotropic::Precision(6, 1e2));
+
 
   const auto& imu_data = imu_integration->imu_data_in_queue();
   int imu_cursor = 0;

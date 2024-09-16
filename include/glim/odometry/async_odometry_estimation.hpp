@@ -52,6 +52,8 @@ public:
    */
   void insert_frame(const PreprocessedFrame::Ptr& frame);
 
+ void insert_gkv(const double stamp, const gtsam::Pose3& pose, const gtsam::Matrix66& cov);
+
   /**
    * @brief Wait for the odometry estimation thread
    */
@@ -81,6 +83,7 @@ private:
   ConcurrentVector<std::pair<double, cv::Mat>> input_image_queue;
   ConcurrentVector<Eigen::Matrix<double, 7, 1>> input_imu_queue;
   ConcurrentVector<PreprocessedFrame::Ptr> input_frame_queue;
+ ConcurrentVector<std::tuple<double, gtsam::Pose3, gtsam::Matrix66>> input_gkv_queue;
 
   // Output queues
   ConcurrentVector<EstimationFrame::ConstPtr> output_estimation_results;

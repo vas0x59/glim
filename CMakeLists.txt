@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(glim VERSION 1.0.2 LANGUAGES CXX)
 
+set(CMAKE_CXX_STANDARD 17)
 add_compile_options(-std=c++17)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake")
 

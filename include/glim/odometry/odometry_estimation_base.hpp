@@ -6,6 +6,8 @@
 #include <opencv2/core.hpp>
 #include <glim/odometry/estimation_frame.hpp>
 #include <glim/preprocess/preprocessed_frame.hpp>
+#include <gtsam/geometry/Pose3.h>
+#include <gtsam/linear/NoiseModel.h>
 
 namespace spdlog {
 class logger;
@@ -41,6 +43,9 @@ public:
    * @param angular_vel  Angular velocity
    */
   virtual void insert_imu(const double stamp, const Eigen::Vector3d& linear_acc, const Eigen::Vector3d& angular_vel);
+
+  virtual void insert_gkv(const double stamp, const gtsam::Pose3& pose, const gtsam::Matrix66& cov);
+
 
   /**
    * @brief Insert a point cloud

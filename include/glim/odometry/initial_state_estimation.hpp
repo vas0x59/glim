@@ -4,6 +4,7 @@
 #include <Eigen/Geometry>
 
 #include <glim/odometry/estimation_frame.hpp>
+#include <gtsam/geometry/Pose3.h>
 
 namespace spdlog {
 class logger;
@@ -40,6 +41,7 @@ public:
    * @return nullptr                    If it's not ready
    */
   virtual EstimationFrame::ConstPtr initial_pose() = 0;
+  virtual EstimationFrame::ConstPtr initial_pose(const gtsam::Pose3& zero) { return initial_pose();};
 
 protected:
   // Logging
@@ -58,7 +60,8 @@ public:
   virtual ~NaiveInitialStateEstimation() override;
 
   virtual void insert_imu(double stamp, const Eigen::Vector3d& linear_acc, const Eigen::Vector3d& angular_vel) override;
-  virtual EstimationFrame::ConstPtr initial_pose() override;
+  virtual EstimationFrame::ConstPtr initial_pose() {initial_pose({});};
+  virtual EstimationFrame::ConstPtr initial_pose(const gtsam::Pose3& zero) override;
 
   void set_init_state(const Eigen::Isometry3d& init_T_world_imu, const Eigen::Vector3d& init_v_world_imu);
 

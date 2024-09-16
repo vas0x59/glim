@@ -18,6 +18,7 @@
     // Topics
     "imu_topic": "/ouster_top/imu",
     "points_topic": "/joined_point_cloud_raw",
-    "image_topic": "/image"
+    "image_topic": "/image",
+    "gkv_topic" : "/gkv_switched/odom"
   }
 }

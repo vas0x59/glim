@@ -33,6 +33,9 @@ void AsyncOdometryEstimation::insert_imu(const double stamp, const Eigen::Vector
 void AsyncOdometryEstimation::insert_frame(const PreprocessedFrame::Ptr& frame) {
   input_frame_queue.push_back(frame);
 }
+void AsyncOdometryEstimation::insert_gkv(const double stamp, const gtsam::Pose3& pose, const gtsam::Matrix66& cov) {
+  input_gkv_queue.push_back({stamp, pose, cov});
+}
 
 void AsyncOdometryEstimation::join() {
   end_of_sequence = true;
@@ -57,6 +60,7 @@ void AsyncOdometryEstimation::run() {
 
   while (!kill_switch) {
     auto imu_frames = input_imu_queue.get_all_and_clear();
+    auto gkvs = input_gkv_queue.get_all_and_clear();
     auto new_images = input_image_queue.get_all_and_clear();
     auto new_raw_frames = input_frame_queue.get_all_and_clear();
 
@@ -80,6 +84,11 @@ void AsyncOdometryEstimation::run() {
       odometry_estimation->insert_imu(stamp, linear_acc, angular_vel);
 
       last_imu_time = stamp;
+    }
+
+    for (const auto &t : gkvs) {
+      const auto &[stamp, pose, cov] = t;
+      odometry_estimation->insert_gkv(stamp, pose, cov);
     }
 
     while (!images.empty()) {
