@@ -40,6 +40,7 @@ using Callbacks = OdometryEstimationCallbacks;
 using gtsam::symbol_shorthand::B;  // IMU bias
 using gtsam::symbol_shorthand::V;  // IMU velocity   (v_world_imu)
 using gtsam::symbol_shorthand::X;  // IMU pose       (T_world_imu)
+// using gtsam::symbol_shorthand::C;  // IMU pose       (T_world_imu)
 
 OdometryEstimationIMUParams::OdometryEstimationIMUParams(const Eigen::Isometry3d &T_lidar_imu_inp) : OdometryEstimationIMUParams() {
   T_lidar_imu = T_lidar_imu_inp;
@@ -87,6 +88,7 @@ OdometryEstimationIMU::OdometryEstimationIMU(std::unique_ptr<OdometryEstimationI
   T_lidar_imu.setIdentity();
   T_imu_lidar.setIdentity();
   gkv_buffer.set_capacity(200);
+  loc_buffer.set_capacity(100);
 
   std::cout << "params->T_lidar_imu: " << params->T_lidar_imu.matrix() << std::endl;
 
@@ -136,10 +138,21 @@ void OdometryEstimationIMU::insert_gkv(const double stamp, const gtsam::Pose3& p
 
   // typeof
 }
+void OdometryEstimationIMU::insert_loc(const double stamp, const gtsam::Pose3& pose, const gtsam::Matrix66& cov) {
+  loc_buffer.push_back({{pose, cov}, stamp});
+
+  // typeof
+}
 
 boost::optional<std::pair<std::pair<gtsam::Pose3, gtsam::Matrix66>, double>> OdometryEstimationIMU::find_nearest_gkv(const double stamp) {
   // typeof(this);
   auto data = closest_by_time<boost::circular_buffer<std::pair<std::pair<gtsam::Pose3, gtsam::Matrix66>, double>>::iterator, std::pair<gtsam::Pose3, gtsam::Matrix66>>(gkv_buffer.begin(), gkv_buffer.end(), stamp);
+  return data;
+}
+
+boost::optional<std::pair<std::pair<gtsam::Pose3, gtsam::Matrix66>, double>> OdometryEstimationIMU::find_nearest_loc(const double stamp) {
+  // typeof(this);
+  auto data = closest_by_time<boost::circular_buffer<std::pair<std::pair<gtsam::Pose3, gtsam::Matrix66>, double>>::iterator, std::pair<gtsam::Pose3, gtsam::Matrix66>>(loc_buffer.begin(), loc_buffer.end(), stamp);
   return data;
 }
 
@@ -342,9 +355,16 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
 
   new_factors.add(create_factors(current, imu_factor, new_values));
 
-  auto opt_pose = find_nearest_gkv(new_frame->stamp);
-  if (opt_pose.has_value() && abs(new_frame->stamp - opt_pose->second) < 0.05) {
-    new_factors.add(gtsam::PriorFactor<gtsam::Pose3>(X(current), opt_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(opt_pose->first.second*10))); // add gkv
+  // GKV
+  auto gkv_pose = find_nearest_gkv(new_frame->stamp);
+  if (gkv_pose.has_value() && abs(new_frame->stamp - gkv_pose->second) < 0.05) {
+    new_factors.add(gtsam::PriorFactor<gtsam::Pose3>(X(current), gkv_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(gkv_pose->first.second*10))); // add gkv
+  }
+
+  // LOC
+  auto loc_pose = find_nearest_loc(new_frame->stamp);
+  if (loc_pose.has_value() && abs(new_frame->stamp - loc_pose->second) < 0.05) {
+    new_factors.add(gtsam::PriorFactor<gtsam::Pose3>(X(current), loc_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(loc_pose->first.second))); // add loc
   }
 
   // Update smoother

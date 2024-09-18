@@ -46,6 +46,8 @@ public:
 
   virtual void insert_gkv(const double stamp, const gtsam::Pose3& pose, const gtsam::Matrix66& cov);
 
+ virtual void insert_loc(const double stamp, const gtsam::Pose3& pose, const gtsam::Matrix66& cov);
+
 
   /**
    * @brief Insert a point cloud

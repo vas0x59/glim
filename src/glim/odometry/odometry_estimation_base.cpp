@@ -18,6 +18,10 @@ void OdometryEstimationBase::insert_gkv(const double stamp, const gtsam::Pose3& 
   // Callbacks::on_insert_image(stamp, image);
   std::cout << "empty insert_gkv" << std::endl;
 }
+void OdometryEstimationBase::insert_loc(const double stamp, const gtsam::Pose3& pose, const gtsam::Matrix66& cov) {
+  // Callbacks::on_insert_image(stamp, image);
+  std::cout << "empty insert_loc" << std::endl;
+}
 
 
 void OdometryEstimationBase::insert_imu(const double stamp, const Eigen::Vector3d& linear_acc, const Eigen::Vector3d& angular_vel) {
@@ -28,6 +32,7 @@ EstimationFrame::ConstPtr OdometryEstimationBase::insert_frame(const Preprocesse
   Callbacks::on_insert_frame(frame);
   return nullptr;
 }
+
 
 std::shared_ptr<OdometryEstimationBase> OdometryEstimationBase::load_module(const std::string& so_name) {
   return load_module_from_so<OdometryEstimationBase>(so_name, "create_odometry_estimation_module");

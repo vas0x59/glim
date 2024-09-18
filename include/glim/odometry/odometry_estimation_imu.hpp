@@ -82,6 +82,7 @@ public:
 
   virtual void insert_imu(const double stamp, const Eigen::Vector3d& linear_acc, const Eigen::Vector3d& angular_vel) override;
   virtual void insert_gkv(const double stamp, const gtsam::Pose3& pose, const gtsam::Matrix66& cov) override;
+  virtual void insert_loc(const double stamp, const gtsam::Pose3& pose, const gtsam::Matrix66& cov) override;
   virtual EstimationFrame::ConstPtr insert_frame(const PreprocessedFrame::Ptr& frame, std::vector<EstimationFrame::ConstPtr>& marginalized_frames) override;
   virtual std::vector<EstimationFrame::ConstPtr> get_remaining_frames() override;
 
@@ -110,9 +111,12 @@ protected:
   std::unique_ptr<CloudCovarianceEstimation> covariance_estimation;
 
   // gkvs
-  std::mutex gkv_mutex;
+  // std::mutex gkv_mutex;
+  // std::mutex loc_mutex;
   boost::circular_buffer<std::pair<std::pair<gtsam::Pose3, gtsam::Matrix66>, double>> gkv_buffer;
+  boost::circular_buffer<std::pair<std::pair<gtsam::Pose3, gtsam::Matrix66>, double>> loc_buffer;
   boost::optional<std::pair<std::pair<gtsam::Pose3, gtsam::Matrix66>, double>> find_nearest_gkv(const double stamp);
+  boost::optional<std::pair<std::pair<gtsam::Pose3, gtsam::Matrix66>, double>> find_nearest_loc(const double stamp);
 
   // Optimizer
   using FixedLagSmootherExt = gtsam_points::IncrementalFixedLagSmootherExtWithFallback;
