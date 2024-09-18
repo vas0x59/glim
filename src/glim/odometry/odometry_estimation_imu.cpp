@@ -41,6 +41,10 @@ using gtsam::symbol_shorthand::B;  // IMU bias
 using gtsam::symbol_shorthand::V;  // IMU velocity   (v_world_imu)
 using gtsam::symbol_shorthand::X;  // IMU pose       (T_world_imu)
 
+OdometryEstimationIMUParams::OdometryEstimationIMUParams(const Eigen::Isometry3d &T_lidar_imu_inp) : OdometryEstimationIMUParams() {
+  T_lidar_imu = T_lidar_imu_inp;
+}
+
 OdometryEstimationIMUParams::OdometryEstimationIMUParams() {
   // sensor config
   Config sensor_config(GlobalConfig::get_config_path("config_sensors"));
@@ -84,6 +88,8 @@ OdometryEstimationIMU::OdometryEstimationIMU(std::unique_ptr<OdometryEstimationI
   T_imu_lidar.setIdentity();
   gkv_buffer.set_capacity(200);
 
+  std::cout << "params->T_lidar_imu: " << params->T_lidar_imu.matrix() << std::endl;
+
   if (!params->estimate_init_state || params->initialization_mode == "NAIVE") {
     auto init_estimation = new NaiveInitialStateEstimation(params->T_lidar_imu, params->imu_bias);
     if (!params->estimate_init_state) {
@@ -96,6 +102,9 @@ OdometryEstimationIMU::OdometryEstimationIMU(std::unique_ptr<OdometryEstimationI
   } else {
     logger->error("unknown initialization mode {}", params->initialization_mode);
   }
+  // if (this->init_estimation) {
+  //   this->init_estimation.T
+  // }
 
   imu_integration.reset(new IMUIntegration);
   deskewing.reset(new CloudDeskewing);
@@ -335,7 +344,7 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
 
   auto opt_pose = find_nearest_gkv(new_frame->stamp);
   if (opt_pose.has_value() && abs(new_frame->stamp - opt_pose->second) < 0.05) {
-    new_factors.add(gtsam::PriorFactor<gtsam::Pose3>(X(current), opt_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(opt_pose->first.second*3))); // add gkv
+    new_factors.add(gtsam::PriorFactor<gtsam::Pose3>(X(current), opt_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(opt_pose->first.second*10))); // add gkv
   }
 
   // Update smoother
@@ -369,6 +378,7 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
   }
   std::cout << "time: " << duration<double, std::milli>( high_resolution_clock::now() - t1).count() << "ms\n";
 
+  // std::cout << "T_lidar_imu" << T_lidar_imu.matrix() << std::endl;
   return frames[current];
 }
 

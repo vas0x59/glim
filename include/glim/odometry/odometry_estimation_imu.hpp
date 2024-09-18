@@ -41,6 +41,7 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   OdometryEstimationIMUParams();
+  explicit OdometryEstimationIMUParams(const Eigen::Isometry3d &T_lidar_imu_inp);
   virtual ~OdometryEstimationIMUParams();
 
 public:

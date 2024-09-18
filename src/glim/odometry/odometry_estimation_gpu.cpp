@@ -34,6 +34,10 @@ using Callbacks = OdometryEstimationCallbacks;
 // using gtsam::symbol_shorthand::V;  // IMU velocity   (v_world_imu)
 using gtsam::symbol_shorthand::X;  // IMU pose       (T_world_imu)
 
+OdometryEstimationGPUParams::OdometryEstimationGPUParams(const Eigen::Isometry3d &T_lidar_imu_inp) : OdometryEstimationGPUParams() {
+  T_lidar_imu = T_lidar_imu_inp;
+}
+
 OdometryEstimationGPUParams::OdometryEstimationGPUParams() : OdometryEstimationIMUParams() {
   // odometry config
   Config config(GlobalConfig::get_config_path("config_odometry"));
@@ -72,6 +76,7 @@ OdometryEstimationGPU::OdometryEstimationGPU(const OdometryEstimationGPUParams& 
 
   stream.reset(new gtsam_points::CUDAStream());
   stream_buffer_roundrobin.reset(new gtsam_points::StreamTempBufferRoundRobin());
+  std::cout << "T_lidar_imu" << T_lidar_imu.matrix() << std::endl;
 }
 
 OdometryEstimationGPU::~OdometryEstimationGPU() {

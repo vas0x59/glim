@@ -16,7 +16,9 @@ NaiveInitialStateEstimation::NaiveInitialStateEstimation(const Eigen::Isometry3d
   T_lidar_imu(T_lidar_imu),
   force_init(false),
   init_T_world_imu(Eigen::Isometry3d::Identity()),
-  init_v_world_imu(Eigen::Vector3d::Zero()) {}
+  init_v_world_imu(Eigen::Vector3d::Zero()) {
+  std::cout << "T_lidar_imu_init_se" << T_lidar_imu.matrix() << std::endl;
+}
 
 NaiveInitialStateEstimation::~NaiveInitialStateEstimation() {}
 
