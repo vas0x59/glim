@@ -54,6 +54,7 @@ public:
   Eigen::Isometry3d T_lidar_imu;    ///< LiDAR-IMU transformation
   Eigen::Isometry3d T_world_lidar;  ///< LiDAR pose in the world space
   Eigen::Isometry3d T_world_imu;    ///< IMU pose in the world space
+ Eigen::Isometry3d T_imu_gkv;
 
   Eigen::Vector3d v_world_imu;           ///< IMU velocity in the world frame
   Eigen::Matrix<double, 6, 1> imu_bias;  ///< IMU bias

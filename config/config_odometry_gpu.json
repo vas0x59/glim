@@ -34,6 +34,7 @@
     "isam2_relinearize_skip": 1,
     "isam2_relinearize_thresh": 0.1,
     "fix_imu_bias": false,
+    "estimate_gkv_pose": true,
     // Voxel params
     "voxel_resolution": 0.25,
     "voxelmap_levels": 2,

@@ -21,6 +21,9 @@
 
 #include <gtsam/nonlinear/Marginals.h>
 
+
+
+
 namespace glim {
 
 template<typename InputIterator, typename ValueType>
@@ -40,7 +43,7 @@ using Callbacks = OdometryEstimationCallbacks;
 using gtsam::symbol_shorthand::B;  // IMU bias
 using gtsam::symbol_shorthand::V;  // IMU velocity   (v_world_imu)
 using gtsam::symbol_shorthand::X;  // IMU pose       (T_world_imu)
-// using gtsam::symbol_shorthand::C;  // IMU pose       (T_world_imu)
+using gtsam::symbol_shorthand::C;  // GKV pose       (T_imu_gkv)
 
 OdometryEstimationIMUParams::OdometryEstimationIMUParams(const Eigen::Isometry3d &T_lidar_imu_inp) : OdometryEstimationIMUParams() {
   T_lidar_imu = T_lidar_imu_inp;
@@ -51,6 +54,7 @@ OdometryEstimationIMUParams::OdometryEstimationIMUParams() {
   Config sensor_config(GlobalConfig::get_config_path("config_sensors"));
   T_lidar_imu = sensor_config.param<Eigen::Isometry3d>("sensors", "T_lidar_imu", Eigen::Isometry3d::Identity());
   imu_bias_noise = sensor_config.param<double>("sensors", "imu_bias_noise", 1e-3);
+
   auto bias = sensor_config.param<std::vector<double>>("sensors", "imu_bias");
   if (bias && bias->size() == 6) {
     imu_bias = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(bias->data());
@@ -62,6 +66,7 @@ OdometryEstimationIMUParams::OdometryEstimationIMUParams() {
   Config config(GlobalConfig::get_config_path("config_odometry"));
 
   fix_imu_bias = config.param<bool>("odometry_estimation", "fix_imu_bias", false);
+  estimate_gkv_pose = config.param<bool>("odometry_estimation", "estimate_gkv_pose", false);
 
   initialization_mode = config.param<std::string>("odometry_estimation", "initialization_mode", "LOOSE");
   const auto init_T_world_imu = config.param<Eigen::Isometry3d>("odometry_estimation", "init_T_world_imu");
@@ -70,6 +75,7 @@ OdometryEstimationIMUParams::OdometryEstimationIMUParams() {
   this->init_T_world_imu = init_T_world_imu.value_or(Eigen::Isometry3d::Identity());
   this->init_v_world_imu = init_v_world_imu.value_or(Eigen::Vector3d::Zero());
   this->init_pose_damping_scale = config.param<double>("odometry_estimation", "init_pose_damping_scale", 1e10);
+  // this->
 
   smoother_lag = config.param<double>("odometry_estimation", "smoother_lag", 5.0);
   use_isam2_dogleg = config.param<bool>("odometry_estimation", "use_isam2_dogleg", false);
@@ -209,6 +215,8 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
     new_frame->v_world_imu = init_state->v_world_imu;
     new_frame->imu_bias = init_state->imu_bias;
     new_frame->raw_frame = raw_frame;
+    new_frame->T_imu_gkv = Eigen::Isometry3d::Identity();
+
 
     // Transform points into IMU frame
     std::vector<Eigen::Vector4d> points_imu(raw_frame->size());
@@ -238,10 +246,18 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
     new_stamps[X(0)] = raw_frame->stamp;
     new_stamps[V(0)] = raw_frame->stamp;
     new_stamps[B(0)] = raw_frame->stamp;
+    if (params->estimate_gkv_pose) {
+      new_stamps[C(0)] = raw_frame->stamp;
+    }
 
     new_values.insert(X(0), gtsam::Pose3(new_frame->T_world_imu.matrix()));
     new_values.insert(V(0), new_frame->v_world_imu);
     new_values.insert(B(0), gtsam::imuBias::ConstantBias(new_frame->imu_bias));
+
+    if (params->estimate_gkv_pose) {
+
+      new_values.insert(C(0), gtsam::Pose3(new_frame->T_imu_gkv.matrix()));
+    }
 
     // Prior for initial IMU states
     // new_factors.emplace_shared<gtsam_points::LinearDampingFactor>(X(0), 6, params->init_pose_damping_scale);
@@ -249,6 +265,10 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
     new_factors.emplace_shared<gtsam::PriorFactor<gtsam::Vector3>>(V(0), init_state->v_world_imu, gtsam::noiseModel::Isotropic::Precision(3, 1.0));
     new_factors.emplace_shared<gtsam_points::LinearDampingFactor>(B(0), 6, 1e2);
     new_factors.add(create_factors(current, nullptr, new_values));
+
+    if (params->estimate_gkv_pose) {
+      new_factors.emplace_shared<gtsam_points::LinearDampingFactor>(C(0), 6, 1e5);
+    }
 
     
 
@@ -265,6 +285,10 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
   const double last_stamp = frames[last]->stamp;
   const auto last_T_world_imu = smoother->calculateEstimate<gtsam::Pose3>(X(last));
   const auto last_v_world_imu = smoother->calculateEstimate<gtsam::Vector3>(V(last));
+  gtsam::Pose3 last_T_imu_gkv = gtsam::Pose3::Identity();
+  if (params->estimate_gkv_pose)
+    last_T_imu_gkv = smoother->calculateEstimate<gtsam::Pose3>(C(last));
+
   const auto last_imu_bias = smoother->calculateEstimate<gtsam::imuBias::ConstantBias>(B(last));
   const gtsam::NavState last_nav_world_imu(last_T_world_imu, last_v_world_imu);
 
@@ -283,15 +307,26 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
   new_stamps[V(current)] = raw_frame->stamp;
   new_stamps[B(current)] = raw_frame->stamp;
 
+  if (params->estimate_gkv_pose)
+    new_stamps[C(current)] = raw_frame->stamp;
+
   new_values.insert(X(current), predicted_T_world_imu);
   new_values.insert(V(current), predicted_v_world_imu);
   new_values.insert(B(current), last_imu_bias);
+
+  if (params->estimate_gkv_pose)
+    new_values.insert(C(current), last_T_imu_gkv);
 
   // Constant IMU bias assumption
   new_factors.add(
     gtsam::BetweenFactor<gtsam::imuBias::ConstantBias>(B(last), B(current), gtsam::imuBias::ConstantBias(), gtsam::noiseModel::Isotropic::Sigma(6, params->imu_bias_noise)));
   if (params->fix_imu_bias) {
     new_factors.add(gtsam::PriorFactor<gtsam::imuBias::ConstantBias>(B(current), gtsam::imuBias::ConstantBias(params->imu_bias), gtsam::noiseModel::Isotropic::Precision(6, 1e3)));
+  }
+
+  if (params->estimate_gkv_pose) {
+    new_factors.add(
+      gtsam::BetweenFactor<gtsam::Pose3>(C(last), C(current), gtsam::Pose3::Identity(), gtsam::noiseModel::Isotropic::Precision(6, 1e10)));
   }
 
   // Create IMU factor
@@ -321,6 +356,7 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
   new_frame->v_world_imu = predicted_v_world_imu;
   new_frame->imu_bias = last_imu_bias.vector();
   new_frame->raw_frame = raw_frame;
+  new_frame->T_imu_gkv = Eigen::Isometry3d(last_T_imu_gkv.matrix());
 
   if (params->save_imu_rate_trajectory) {
     new_frame->imu_rate_trajectory.resize(8, pred_imu_times.size());
@@ -358,7 +394,11 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
   // GKV
   auto gkv_pose = find_nearest_gkv(new_frame->stamp);
   if (gkv_pose.has_value() && abs(new_frame->stamp - gkv_pose->second) < 0.05) {
-    new_factors.add(gtsam::PriorFactor<gtsam::Pose3>(X(current), gkv_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(gkv_pose->first.second*10))); // add gkv
+    if (not params->estimate_gkv_pose) {
+      new_factors.add(gtsam::PriorFactor<gtsam::Pose3>(X(current), gkv_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(gkv_pose->first.second))); // add gkv
+    } else {
+      new_factors.add(glim::factors::GKVShiftedRelativePose3(X(current), C(current), gkv_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(gkv_pose->first.second)));
+    }
   }
 
   // LOC
@@ -430,6 +470,7 @@ void OdometryEstimationIMU::update_frames(int current, const gtsam::NonlinearFac
 
   for (int i = marginalized_cursor; i < frames.size(); i++) {
     try {
+
       Eigen::Isometry3d T_world_imu = Eigen::Isometry3d(smoother->calculateEstimate<gtsam::Pose3>(X(i)).matrix());
       Eigen::Vector3d v_world_imu = smoother->calculateEstimate<gtsam::Vector3>(V(i));
       Eigen::Matrix<double, 6, 1> imu_bias = smoother->calculateEstimate<gtsam::imuBias::ConstantBias>(B(i)).vector();
@@ -445,7 +486,11 @@ void OdometryEstimationIMU::update_frames(int current, const gtsam::NonlinearFac
         // auto cov = marginals.marginalCovariance(X(i));
         // std::cout << "cov_marginals: " << i << ": " << cov.diagonal().transpose().array().pow(0.5) << std::endl;
       // }
-
+      if (params->estimate_gkv_pose) {
+        auto ppp = smoother->calculateEstimate<gtsam::Pose3>(C(i));
+        std::cout << "T_imu_gkv" << ppp << std::endl;
+        frames[i]->T_imu_gkv = Eigen::Isometry3d(ppp.matrix());
+      }
       frames[i]->T_world_imu = T_world_imu;
       frames[i]->T_world_lidar = T_world_imu * T_imu_lidar;
       frames[i]->v_world_imu = v_world_imu;
@@ -461,7 +506,13 @@ void OdometryEstimationIMU::update_frames(int current, const gtsam::NonlinearFac
   }
   {
     auto cov = smoother->marginalCovariance(X(current));
-    std::cout << "current: " << current << ": " << cov.diagonal().transpose().array().pow(0.5) << std::endl;
+    std::cout << "X(" << current << ") cov: " << cov.diagonal().transpose().array().pow(0.5) << std::endl;
+  }
+  try {
+    auto cov = smoother->marginalCovariance(C(current));
+    std::cout << "C(" << current << ") cov: " << cov.diagonal().transpose().array().pow(0.5) << std::endl;
+  } catch (std::out_of_range e) {
+    std::cout << e.what() << std::endl;
   }
 
 }

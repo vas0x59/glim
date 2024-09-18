@@ -13,6 +13,7 @@
 
 #include <mutex>
 
+#include <glim/factors/GKVFactors.hpp>
 
 namespace gtsam {
 class Pose3;
@@ -45,6 +46,7 @@ public:
   virtual ~OdometryEstimationIMUParams();
 
 public:
+  bool estimate_gkv_pose;
   // Sensor params;
   bool fix_imu_bias;
   double imu_bias_noise;
