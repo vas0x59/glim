@@ -23,7 +23,10 @@ void OdometryEstimationBase::insert_loc(const double stamp, const gtsam::Pose3& 
   std::cout << "empty insert_loc" << std::endl;
 }
 
-
+void OdometryEstimationBase::insert_translation(const double stamp, const gtsam::Point3& pose, const gtsam::Matrix33& cov) {
+  // Callbacks::on_insert_image(stamp, image);
+  std::cout << "empty insert_translation" << std::endl;
+}
 void OdometryEstimationBase::insert_imu(const double stamp, const Eigen::Vector3d& linear_acc, const Eigen::Vector3d& angular_vel) {
   Callbacks::on_insert_imu(stamp, linear_acc, angular_vel);
 }

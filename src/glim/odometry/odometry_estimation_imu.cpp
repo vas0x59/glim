@@ -20,8 +20,7 @@
 #include <glim/odometry/callbacks.hpp>
 
 #include <gtsam/nonlinear/Marginals.h>
-
-
+#include <gtsam/slam/PoseTranslationPrior.h>
 
 
 namespace glim {
@@ -95,6 +94,7 @@ OdometryEstimationIMU::OdometryEstimationIMU(std::unique_ptr<OdometryEstimationI
   T_imu_lidar.setIdentity();
   gkv_buffer.set_capacity(200);
   loc_buffer.set_capacity(100);
+  translation_buffer.set_capacity(100);
 
   std::cout << "params->T_lidar_imu: " << params->T_lidar_imu.matrix() << std::endl;
 
@@ -149,6 +149,11 @@ void OdometryEstimationIMU::insert_loc(const double stamp, const gtsam::Pose3& p
 
   // typeof
 }
+void OdometryEstimationIMU::insert_translation(const double stamp, const gtsam::Point3& pose, const gtsam::Matrix33& cov) {
+  translation_buffer.push_back({{pose, cov}, stamp});
+
+  // typeof
+}
 
 boost::optional<std::pair<std::pair<gtsam::Pose3, gtsam::Matrix66>, double>> OdometryEstimationIMU::find_nearest_gkv(const double stamp) {
   // typeof(this);
@@ -161,6 +166,12 @@ boost::optional<std::pair<std::pair<gtsam::Pose3, gtsam::Matrix66>, double>> Odo
   auto data = closest_by_time<boost::circular_buffer<std::pair<std::pair<gtsam::Pose3, gtsam::Matrix66>, double>>::iterator, std::pair<gtsam::Pose3, gtsam::Matrix66>>(loc_buffer.begin(), loc_buffer.end(), stamp);
   return data;
 }
+boost::optional<std::pair<std::pair<gtsam::Point3, gtsam::Matrix33>, double>> OdometryEstimationIMU::find_nearest_translation(const double stamp) {
+  // typeof(this);
+  auto data = closest_by_time<boost::circular_buffer<std::pair<std::pair<gtsam::Point3, gtsam::Matrix33>, double>>::iterator, std::pair<gtsam::Point3, gtsam::Matrix33>>(translation_buffer.begin(), translation_buffer.end(), stamp);
+  return data;
+}
+
 
 EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const PreprocessedFrame::Ptr& raw_frame, std::vector<EstimationFrame::ConstPtr>& marginalized_frames) {
   using std::chrono::high_resolution_clock;
@@ -393,18 +404,59 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
 
   // GKV
   auto gkv_pose = find_nearest_gkv(new_frame->stamp);
-  if (gkv_pose.has_value() && abs(new_frame->stamp - gkv_pose->second) < 0.05) {
+  if (gkv_pose.has_value() && abs(new_frame->stamp - gkv_pose->second) < 0.02) {
+    std::cout << "added gkv to X(" << current << ") : " << gkv_pose->first.first.translation().transpose() << " tc - tg= " << new_frame->stamp - gkv_pose->second   << std::endl;
+
     if (not params->estimate_gkv_pose) {
-      new_factors.add(gtsam::PriorFactor<gtsam::Pose3>(X(current), gkv_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(gkv_pose->first.second))); // add gkv
+      new_factors.add(gtsam::PriorFactor<gtsam::Pose3>(X(current), gkv_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(gkv_pose->first.second /10000.))); // add gkv
     } else {
-      new_factors.add(glim::factors::GKVShiftedRelativePose3(X(current), C(current), gkv_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(gkv_pose->first.second)));
+      new_factors.add(glim::factors::GKVShiftedRelativePose3(X(current), C(current), gkv_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(gkv_pose->first.second /100.)));
     }
   }
 
   // LOC
-  auto loc_pose = find_nearest_loc(new_frame->stamp);
-  if (loc_pose.has_value() && abs(new_frame->stamp - loc_pose->second) < 0.05) {
-    new_factors.add(gtsam::PriorFactor<gtsam::Pose3>(X(current), loc_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(loc_pose->first.second))/3); // add loc
+  // auto loc_pose = find_nearest_loc(new_frame->stamp);
+  // if (loc_pose.has_value() && abs(new_frame->stamp - loc_pose->second) < 0.05) {
+  //   new_factors.add(gtsam::PriorFactor<gtsam::Pose3>(X(current), loc_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(loc_pose->first.second))); // add loc
+  // }
+
+  // translation
+
+  // auto translation_pose = find_nearest_translation(new_frame->stamp);
+  // if (translation_pose.has_value() && abs(new_frame->stamp - translation_pose->second) < 0.05) {
+  //   std::cout << translation_pose->first.first << std::endl;
+  //   new_factors.add(gtsam::PriorFactor<gtsam::Point3>(X(current), translation_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(translation_pose->first.second))); // add loc
+  // }
+
+  // find frame for translation
+  {
+    std::cout << "translation_buffer.size()" << translation_buffer.size() << std::endl;
+    while(!translation_buffer.empty()) {
+      auto p = translation_buffer.back();
+      translation_buffer.pop_back();
+      int target_f = -1;
+      double min_delta = 0;
+      for (int target = current; target > 0 && (frames[current]->stamp  - frames[target]->stamp) < params->smoother_lag*0.8; target--) {
+        double delta = abs(p.second - frames[target]->stamp) ;
+        if (delta < 0.1) {
+          if (delta < min_delta || target_f == -1) {
+            target_f = target;
+            min_delta = delta;
+          }
+        }
+      }
+      if (target_f != -1) {
+        auto factor = gtsam::PoseTranslationPrior<gtsam::Pose3>(X(target_f), p.first.first,gtsam::noiseModel::Gaussian::Covariance(p.first.second / 100.f));
+
+        if  (factor.evaluateError(last_T_world_imu).norm() < 7) {
+          std::cout << "added translation to X(" << target_f << ") : " << p.first.first.transpose() << std::endl;
+
+          new_factors.add(factor); // add loc
+        } else {
+          std::cout << "skipped: " << factor.evaluateError(last_T_world_imu).norm() << std::endl;
+        }
+      }
+    }
   }
 
   // Update smoother
@@ -470,8 +522,11 @@ void OdometryEstimationIMU::update_frames(int current, const gtsam::NonlinearFac
 
   for (int i = marginalized_cursor; i < frames.size(); i++) {
     try {
-
-      Eigen::Isometry3d T_world_imu = Eigen::Isometry3d(smoother->calculateEstimate<gtsam::Pose3>(X(i)).matrix());
+      auto pose = smoother->calculateEstimate<gtsam::Pose3>(X(i));
+      if (i == current) {
+        std::cout << "X(" << current << ") cov: " << pose.translation().transpose() << std::endl;
+      }
+      Eigen::Isometry3d T_world_imu = Eigen::Isometry3d(pose.matrix());
       Eigen::Vector3d v_world_imu = smoother->calculateEstimate<gtsam::Vector3>(V(i));
       Eigen::Matrix<double, 6, 1> imu_bias = smoother->calculateEstimate<gtsam::imuBias::ConstantBias>(B(i)).vector();
 
@@ -488,7 +543,8 @@ void OdometryEstimationIMU::update_frames(int current, const gtsam::NonlinearFac
       // }
       if (params->estimate_gkv_pose) {
         auto ppp = smoother->calculateEstimate<gtsam::Pose3>(C(i));
-        std::cout << "T_imu_gkv" << ppp << std::endl;
+        if (i == current)
+          std::cout << "T_imu_gkv" << ppp << std::endl;
         frames[i]->T_imu_gkv = Eigen::Isometry3d(ppp.matrix());
       }
       frames[i]->T_world_imu = T_world_imu;
@@ -506,6 +562,7 @@ void OdometryEstimationIMU::update_frames(int current, const gtsam::NonlinearFac
   }
   {
     auto cov = smoother->marginalCovariance(X(current));
+    // std::cout << "X(" << current << ") cov: " << cov.diagonal().transpose().array().pow(0.5) << std::endl;
     std::cout << "X(" << current << ") cov: " << cov.diagonal().transpose().array().pow(0.5) << std::endl;
   }
   try {

@@ -40,6 +40,9 @@ void AsyncOdometryEstimation::insert_loc(const double stamp, const gtsam::Pose3&
   input_loc_queue.push_back({stamp, pose, cov});
 }
 
+void AsyncOdometryEstimation::insert_translation(const double stamp, const gtsam::Point3& pose, const gtsam::Matrix33& cov) {
+  input_tr_queue.push_back({stamp, pose, cov});
+}
 void AsyncOdometryEstimation::join() {
   end_of_sequence = true;
   if (thread.joinable()) {
@@ -65,6 +68,7 @@ void AsyncOdometryEstimation::run() {
     auto imu_frames = input_imu_queue.get_all_and_clear();
     auto gkvs = input_gkv_queue.get_all_and_clear();
     auto locs = input_loc_queue.get_all_and_clear();
+    auto trs = input_tr_queue.get_all_and_clear();
     auto new_images = input_image_queue.get_all_and_clear();
     auto new_raw_frames = input_frame_queue.get_all_and_clear();
 
@@ -99,6 +103,11 @@ void AsyncOdometryEstimation::run() {
     for (const auto &t : locs) {
       const auto &[stamp, pose, cov] = t;
       odometry_estimation->insert_loc(stamp, pose, cov);
+    }
+
+    for (const auto &t : trs) {
+      const auto &[stamp, pose, cov] = t;
+      odometry_estimation->insert_translation(stamp, pose, cov);
     }
 
     while (!images.empty()) {

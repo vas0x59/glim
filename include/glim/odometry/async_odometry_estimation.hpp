@@ -55,6 +55,7 @@ public:
   void insert_gkv(const double stamp, const gtsam::Pose3& pose, const gtsam::Matrix66& cov);
 
   void insert_loc(const double stamp, const gtsam::Pose3& pose, const gtsam::Matrix66& cov);
+  void insert_translation(const double stamp, const gtsam::Point3& pose, const gtsam::Matrix33& cov);
 
 
   /**
@@ -88,6 +89,7 @@ private:
   ConcurrentVector<PreprocessedFrame::Ptr> input_frame_queue;
   ConcurrentVector<std::tuple<double, gtsam::Pose3, gtsam::Matrix66>> input_gkv_queue;
   ConcurrentVector<std::tuple<double, gtsam::Pose3, gtsam::Matrix66>> input_loc_queue;
+  ConcurrentVector<std::tuple<double, gtsam::Point3, gtsam::Matrix33>> input_tr_queue;
 
   // Output queues
   ConcurrentVector<EstimationFrame::ConstPtr> output_estimation_results;

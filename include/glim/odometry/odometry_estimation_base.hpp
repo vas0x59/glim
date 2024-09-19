@@ -47,6 +47,7 @@ public:
   virtual void insert_gkv(const double stamp, const gtsam::Pose3& pose, const gtsam::Matrix66& cov);
 
  virtual void insert_loc(const double stamp, const gtsam::Pose3& pose, const gtsam::Matrix66& cov);
+ virtual void insert_translation(const double stamp, const gtsam::Point3& pose, const gtsam::Matrix33& cov);
 
 
   /**
