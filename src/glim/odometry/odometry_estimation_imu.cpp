@@ -404,7 +404,7 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
   // LOC
   auto loc_pose = find_nearest_loc(new_frame->stamp);
   if (loc_pose.has_value() && abs(new_frame->stamp - loc_pose->second) < 0.05) {
-    new_factors.add(gtsam::PriorFactor<gtsam::Pose3>(X(current), loc_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(loc_pose->first.second))/3); // add loc
+    new_factors.add(gtsam::PriorFactor<gtsam::Pose3>(X(current), loc_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(loc_pose->first.second/3.))); // add loc
   }
 
   // Update smoother
