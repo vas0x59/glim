@@ -37,7 +37,7 @@ void NaiveInitialStateEstimation::insert_imu(double stamp, const Eigen::Vector3d
   sum_acc += linear_acc;
 }
 
-EstimationFrame::ConstPtr NaiveInitialStateEstimation::initial_pose(const gtsam::Pose3& zero) {
+EstimationFrame::ConstPtr NaiveInitialStateEstimation::initial_pose() {
   if (!force_init && sum_acc.squaredNorm() < 10.0) {
     return nullptr;
   }
@@ -64,7 +64,8 @@ EstimationFrame::ConstPtr NaiveInitialStateEstimation::initial_pose(const gtsam:
       estimated->T_world_imu = Eigen::Isometry3d::Identity();
     }
   }
-  estimated->T_world_imu = zero.matrix();
+  // if (zero !)
+  // estimated->T_world_imu = zero.matrix();
 
   estimated->T_world_lidar = estimated->T_world_imu * T_lidar_imu.inverse();
 

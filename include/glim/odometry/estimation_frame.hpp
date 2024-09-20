@@ -7,6 +7,7 @@
 #include <gtsam_points/types/point_cloud.hpp>
 #include <gtsam_points/types/gaussian_voxelmap.hpp>
 #include <glim/preprocess/preprocessed_frame.hpp>
+#include <gtsam/geometry/Pose3.h>
 
 namespace glim {
 
@@ -62,8 +63,10 @@ public:
   PreprocessedFrame::ConstPtr raw_frame;             ///< Raw input point cloud (LiDAR frame)
   Eigen::Matrix<double, 8, -1> imu_rate_trajectory;  ///< IMU-rate trajectory 8 x N  [t, x, y, z, qx, qy, qz, qw]
 
-  gtsam::Pose3 X_cov = gtsam::Pose3::Zero();
-
+  Eigen::Matrix<double, 12, 12> XpXn_cov;
+  gtsam::Pose3 Xp;
+  gtsam::Pose3 Xn;
+  double prev_stamp = -1;
   FrameID frame_id;                                            ///< Coordinate frame of $frame
   gtsam_points::PointCloud::ConstPtr frame;                    ///< Deskewed points for state estimation
   std::vector<gtsam_points::GaussianVoxelMap::Ptr> voxelmaps;  ///< Multi-resolution voxelmaps

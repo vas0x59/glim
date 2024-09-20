@@ -60,8 +60,10 @@ public:
   virtual ~NaiveInitialStateEstimation() override;
 
   virtual void insert_imu(double stamp, const Eigen::Vector3d& linear_acc, const Eigen::Vector3d& angular_vel) override;
-  virtual EstimationFrame::ConstPtr initial_pose() {initial_pose({});};
-  virtual EstimationFrame::ConstPtr initial_pose(const gtsam::Pose3& zero) override;
+  virtual EstimationFrame::ConstPtr initial_pose() override;
+  virtual EstimationFrame::ConstPtr initial_pose(const gtsam::Pose3& zero) override {
+      init_T_world_imu = zero.matrix();
+  };
 
   void set_init_state(const Eigen::Isometry3d& init_T_world_imu, const Eigen::Vector3d& init_v_world_imu);
 

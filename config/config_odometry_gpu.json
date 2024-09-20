@@ -37,10 +37,12 @@
 
 //     "estimate_gkv_pose": true,
     "estimate_gkv_pose": false,
+    "init_using_gkv" : false,
+    "use_gkv" : false,
     
 
     // Voxel params
-    "voxel_resolution": 0.1,
+    "voxel_resolution": 0.25,
     "voxelmap_levels": 2,
     "voxelmap_scaling_factor": 2.0,
     "full_connection_window_size": 2,
