@@ -193,13 +193,18 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
   // The very first frame
   if (frames.empty()) { // begin of init
     init_estimation->insert_frame(raw_frame);
-    auto opt_pose = find_nearest_gkv(raw_frame->stamp);
-    if (not opt_pose.has_value()) {
-      logger->debug("waiting for gkv");
-      return nullptr;
-    }
+    EstimationFrame::ConstPtr init_state = nullptr;
+    if (params->init_using_gkv) {
+      auto opt_pose = find_nearest_gkv(raw_frame->stamp);
+      if (not opt_pose.has_value()) {
+        logger->debug("waiting for gkv");
+        return nullptr;
+      }
 
-    auto init_state = init_estimation->initial_pose(opt_pose->first.first);
+      init_state = init_estimation->initial_pose(opt_pose->first.first);
+    } else {
+      init_state = init_estimation->initial_pose();
+    }
     if (init_state == nullptr) {
       logger->debug("waiting for initial IMU state estimation to be finished");
       return nullptr;
@@ -403,14 +408,16 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
   new_factors.add(create_factors(current, imu_factor, new_values));
 
   // GKV
-  auto gkv_pose = find_nearest_gkv(new_frame->stamp);
-  if (gkv_pose.has_value() && abs(new_frame->stamp - gkv_pose->second) < 0.02) {
-    std::cout << "added gkv to X(" << current << ") : " << gkv_pose->first.first.translation().transpose() << " tc - tg= " << new_frame->stamp - gkv_pose->second   << std::endl;
+  if (params->use_gkv) {
+    auto gkv_pose = find_nearest_gkv(new_frame->stamp);
+    if (gkv_pose.has_value() && abs(new_frame->stamp - gkv_pose->second) < 0.02) {
+      std::cout << "added gkv to X(" << current << ") : " << gkv_pose->first.first.translation().transpose() << " tc - tg= " << new_frame->stamp - gkv_pose->second   << std::endl;
 
-    if (not params->estimate_gkv_pose) {
-      new_factors.add(gtsam::PriorFactor<gtsam::Pose3>(X(current), gkv_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(gkv_pose->first.second /10000.))); // add gkv
-    } else {
-      new_factors.add(glim::factors::GKVShiftedRelativePose3(X(current), C(current), gkv_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(gkv_pose->first.second /100.)));
+      if (not params->estimate_gkv_pose) {
+        new_factors.add(gtsam::PriorFactor<gtsam::Pose3>(X(current), gkv_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(gkv_pose->first.second /10000.))); // add gkv
+      } else {
+        new_factors.add(glim::factors::GKVShiftedRelativePose3(X(current), C(current), gkv_pose->first.first, gtsam::noiseModel::Gaussian::Covariance(gkv_pose->first.second /100.)));
+      }
     }
   }
 
@@ -562,6 +569,7 @@ void OdometryEstimationIMU::update_frames(int current, const gtsam::NonlinearFac
   }
   {
     auto cov = smoother->marginalCovariance(X(current));
+    frames[current]->X_cov = cov;
     // std::cout << "X(" << current << ") cov: " << cov.diagonal().transpose().array().pow(0.5) << std::endl;
     std::cout << "X(" << current << ") cov: " << cov.diagonal().transpose().array().pow(0.5) << std::endl;
   }

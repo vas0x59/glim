@@ -62,6 +62,8 @@ public:
   PreprocessedFrame::ConstPtr raw_frame;             ///< Raw input point cloud (LiDAR frame)
   Eigen::Matrix<double, 8, -1> imu_rate_trajectory;  ///< IMU-rate trajectory 8 x N  [t, x, y, z, qx, qy, qz, qw]
 
+  gtsam::Pose3 X_cov = gtsam::Pose3::Zero();
+
   FrameID frame_id;                                            ///< Coordinate frame of $frame
   gtsam_points::PointCloud::ConstPtr frame;                    ///< Deskewed points for state estimation
   std::vector<gtsam_points::GaussianVoxelMap::Ptr> voxelmaps;  ///< Multi-resolution voxelmaps
