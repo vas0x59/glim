@@ -62,7 +62,11 @@ public:
   virtual void insert_imu(double stamp, const Eigen::Vector3d& linear_acc, const Eigen::Vector3d& angular_vel) override;
   virtual EstimationFrame::ConstPtr initial_pose() override;
   virtual EstimationFrame::ConstPtr initial_pose(const gtsam::Pose3& zero) override {
-      init_T_world_imu = zero.matrix();
+      init_T_world_imu = Eigen::Isometry3d(zero.matrix());
+      init_v_world_imu = Eigen::Vector3d::Zero();
+      force_init = true;
+      std::cout << "zero:\n" << zero << std::endl;
+      initial_pose();
   };
 
   void set_init_state(const Eigen::Isometry3d& init_T_world_imu, const Eigen::Vector3d& init_v_world_imu);
