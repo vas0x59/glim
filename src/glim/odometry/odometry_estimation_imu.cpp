@@ -66,6 +66,9 @@ OdometryEstimationIMUParams::OdometryEstimationIMUParams() {
 
   fix_imu_bias = config.param<bool>("odometry_estimation", "fix_imu_bias", false);
   estimate_gkv_pose = config.param<bool>("odometry_estimation", "estimate_gkv_pose", false);
+  use_gkv = config.param<bool>("odometry_estimation", "use_gkv", false);
+  init_using_gkv = config.param<bool>("odometry_estimation", "init_using_gkv", false);
+
 
   initialization_mode = config.param<std::string>("odometry_estimation", "initialization_mode", "LOOSE");
   const auto init_T_world_imu = config.param<Eigen::Isometry3d>("odometry_estimation", "init_T_world_imu");
@@ -95,7 +98,7 @@ OdometryEstimationIMU::OdometryEstimationIMU(std::unique_ptr<OdometryEstimationI
   gkv_buffer.set_capacity(200);
   loc_buffer.set_capacity(100);
   translation_buffer.set_capacity(100);
-
+  std::cout << "hello" << std::endl;
   std::cout << "params->T_lidar_imu: " << params->T_lidar_imu.matrix() << std::endl;
 
   if (!params->estimate_init_state || params->initialization_mode == "NAIVE") {
@@ -178,7 +181,7 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
   using std::chrono::duration_cast;
   using std::chrono::duration;
   using std::chrono::milliseconds;
-    
+  std::cout << "insert_frame" << std::endl;
   auto t1 = high_resolution_clock::now();
   if (raw_frame->size()) {
     logger->trace("insert_frame points={} times={} ~ {}", raw_frame->size(), raw_frame->times.front(), raw_frame->times.back());
@@ -193,6 +196,7 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
   // The very first frame
   if (frames.empty()) { // begin of init
     init_estimation->insert_frame(raw_frame);
+    std::cout << "AAAAA" << std::endl;
     EstimationFrame::ConstPtr init_state = nullptr;
     if (params->init_using_gkv) {
       auto opt_pose = find_nearest_gkv(raw_frame->stamp);
@@ -200,11 +204,11 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
         logger->debug("waiting for gkv");
         return nullptr;
       }
-
       init_state = init_estimation->initial_pose(opt_pose->first.first);
     } else {
       init_state = init_estimation->initial_pose();
     }
+    std::cout << "ddd" << std::endl;
     if (init_state == nullptr) {
       logger->debug("waiting for initial IMU state estimation to be finished");
       return nullptr;
@@ -524,12 +528,13 @@ void OdometryEstimationIMU::update_frames(int current, const gtsam::NonlinearFac
 
   // auto graph = smoother->getLinearFactors();
   // graph.print("graph: ");
-  // auto values = smoother->calculateEstimate();
+  auto values = smoother->calculateEstimate();
   // gtsam::Marginals marginals(graph, values);
 
   for (int i = marginalized_cursor; i < frames.size(); i++) {
     try {
-      auto pose = smoother->calculateEstimate<gtsam::Pose3>(X(i));
+      // auto pose = smoother->calculateEstimate<gtsam::Pose3>(X(i));
+      auto pose = values.at<gtsam::Pose3>(X(i));
       if (i == current) {
         std::cout << "X(" << current << ") cov: " << pose.translation().transpose() << std::endl;
       }
@@ -568,16 +573,30 @@ void OdometryEstimationIMU::update_frames(int current, const gtsam::NonlinearFac
     }
   }
   {
-    auto cov = smoother->marginalCovariance(X(current));
-    frames[current]->X_cov = cov;
+    gtsam::Matrix66 cov = smoother->marginalCovariance(X(current));
     // std::cout << "X(" << current << ") cov: " << cov.diagonal().transpose().array().pow(0.5) << std::endl;
-    std::cout << "X(" << current << ") cov: " << cov.diagonal().transpose().array().pow(0.5) << std::endl;
   }
-  try {
-    auto cov = smoother->marginalCovariance(C(current));
-    std::cout << "C(" << current << ") cov: " << cov.diagonal().transpose().array().pow(0.5) << std::endl;
-  } catch (std::out_of_range e) {
-    std::cout << e.what() << std::endl;
+  int N_prev = 4;
+  if (current > (N_prev + 1)) {
+    auto prev = current - N_prev;
+    auto graph = smoother->getLinearFactors();
+    gtsam::Marginals marginals(graph, values);
+    if (values.exists(X(prev))) {
+        auto joined_cov = marginals.jointMarginalCovariance({X(current), X(prev)}).fullMatrix();
+        frames[current]->prev_stamp = frames[prev]->stamp;
+        frames[current]->XpXn_cov = joined_cov;
+        frames[current]->Xp = values.at<gtsam::Pose3>(X(prev));
+        frames[current]->Xn = values.at<gtsam::Pose3>(X(current));
+        // std::cout << "X(" << current << ") cov: " << cov.diagonal().transpose().array().pow(0.5) << std::endl;
+    }
+  }
+  if (params->estimate_gkv_pose) {
+    try {
+      auto cov = smoother->marginalCovariance(C(current));
+      std::cout << "C(" << current << ") cov: " << cov.diagonal().transpose().array().pow(0.5) << std::endl;
+    } catch (std::out_of_range e) {
+      std::cout << e.what() << std::endl;
+    }
   }
 
 }

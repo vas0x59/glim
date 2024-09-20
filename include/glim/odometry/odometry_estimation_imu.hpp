@@ -47,6 +47,8 @@ public:
 
 public:
   bool estimate_gkv_pose;
+  bool use_gkv;
+  bool init_using_gkv;
   // Sensor params;
   bool fix_imu_bias;
   double imu_bias_noise;
