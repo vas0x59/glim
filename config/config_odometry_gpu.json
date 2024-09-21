@@ -37,7 +37,7 @@
 
 //     "estimate_gkv_pose": true,
     "estimate_gkv_pose": false,
-    "init_using_gkv" : false,
+    "init_using_gkv" : true,
     "use_gkv" : false,
     
 

@@ -29,6 +29,7 @@
 #include <glim/util/serialization.hpp>
 #include <glim/common/imu_integration.hpp>
 #include <glim/mapping/callbacks.hpp>
+#include <glim/util/convert_to_string.hpp>
 
 namespace glim {
 
@@ -36,6 +37,7 @@ using gtsam::symbol_shorthand::B;
 using gtsam::symbol_shorthand::E;
 using gtsam::symbol_shorthand::V;
 using gtsam::symbol_shorthand::X;
+using gtsam::symbol_shorthand::C;
 
 using Callbacks = GlobalMappingCallbacks;
 
@@ -63,6 +65,7 @@ GlobalMappingParams::GlobalMappingParams() {
   isam2_relinearize_thresh = config.param<double>("global_mapping", "isam2_relinearize_thresh", 0.1);
 
   init_pose_damping_scale = config.param<double>("global_mapping", "init_pose_damping_scale", 1e10);
+  calibs_sdvig = config.param<bool>("global_mapping", "calibs_sdvig", false);
 }
 
 GlobalMappingParams::~GlobalMappingParams() {}
@@ -143,6 +146,10 @@ void GlobalMapping::insert_submap(const SubMap::Ptr& submap) {
 
   if (current == 0) {
     new_factors->emplace_shared<gtsam_points::LinearDampingFactor>(X(0), 6, params.init_pose_damping_scale);
+    if (params.calibs_sdvig) {
+      new_factors->emplace_shared<gtsam_points::LinearDampingFactor>(C(0), 6, 1e9);
+      new_values->insert(C(0), gtsam::Pose3::Identity());
+    }
   } else {
     new_factors->add(*create_between_factors(current));
     new_factors->add(*create_matching_cost_factors(current));
@@ -341,7 +348,12 @@ void GlobalMapping::optimize() {
   auto result = isam2->update(new_factors, new_values);
 
   Callbacks::on_smoother_update_result(*isam2, result);
-
+  // if (result.)
+  // try {
+  //   logger->info("C: {}", convert_to_string(isam2->calculateEstimate<gtsam::Pose3>(C(0)).translation().eval()));
+  // } catch( std::exception e) {
+  //   logger->error("error: {}", e.what());
+  // }
   update_submaps();
   Callbacks::on_update_submaps(submaps);
 }
@@ -368,7 +380,7 @@ boost::shared_ptr<gtsam::NonlinearFactorGraph> GlobalMapping::create_between_fac
   graph.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(X(0), gtsam::Pose3::Identity(), gtsam::noiseModel::Isotropic::Precision(6, 1e6));
 
   auto factor = gtsam::make_shared<gtsam_points::IntegratedGICPFactor>(X(0), X(1), submaps[last]->frame, submaps[current]->frame);
-  factor->set_max_correspondence_distance(0.5);
+  factor->set_max_correspondence_distance(0.8);
   factor->set_num_threads(2);
   graph.add(factor);
 

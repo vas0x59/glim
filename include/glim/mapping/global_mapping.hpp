@@ -49,6 +49,7 @@ public:
   double isam2_relinearize_thresh;
 
   double init_pose_damping_scale;
+  bool calibs_sdvig;
 };
 
 /**
