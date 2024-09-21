@@ -204,7 +204,9 @@ EstimationFrame::ConstPtr OdometryEstimationIMU::insert_frame(const Preprocessed
         logger->debug("waiting for gkv");
         return nullptr;
       }
+    std::cout << "AAAAA1" << std::endl;
       init_state = init_estimation->initial_pose(opt_pose->first.first);
+    std::cout << "AAAAA2" << std::endl;
     } else {
       init_state = init_estimation->initial_pose();
     }
@@ -585,8 +587,8 @@ void OdometryEstimationIMU::update_frames(int current, const gtsam::NonlinearFac
         auto joined_cov = marginals.jointMarginalCovariance({X(current), X(prev)}).fullMatrix();
         frames[current]->prev_stamp = frames[prev]->stamp;
         frames[current]->XpXn_cov = joined_cov;
-        frames[current]->Xp = values.at<gtsam::Pose3>(X(prev));
-        frames[current]->Xn = values.at<gtsam::Pose3>(X(current));
+        frames[current]->Xp = Eigen::Isometry3d(values.at<gtsam::Pose3>(X(prev)).matrix());
+        frames[current]->Xn = Eigen::Isometry3d(values.at<gtsam::Pose3>(X(current)).matrix());
         // std::cout << "X(" << current << ") cov: " << cov.diagonal().transpose().array().pow(0.5) << std::endl;
     }
   }

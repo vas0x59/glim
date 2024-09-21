@@ -70,7 +70,7 @@ EstimationFrame::ConstPtr NaiveInitialStateEstimation::initial_pose() {
   estimated->T_world_lidar = estimated->T_world_imu * T_lidar_imu.inverse();
 
   logger->info("initial IMU state estimation done");
-
+  std::cout << "hhhh" << std::endl;
   return estimated;
 }
 

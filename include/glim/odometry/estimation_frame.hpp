@@ -64,8 +64,8 @@ public:
   Eigen::Matrix<double, 8, -1> imu_rate_trajectory;  ///< IMU-rate trajectory 8 x N  [t, x, y, z, qx, qy, qz, qw]
 
   Eigen::Matrix<double, 12, 12> XpXn_cov;
-  gtsam::Pose3 Xp;
-  gtsam::Pose3 Xn;
+  Eigen::Isometry3d Xp;
+  Eigen::Isometry3d Xn;
   double prev_stamp = -1;
   FrameID frame_id;                                            ///< Coordinate frame of $frame
   gtsam_points::PointCloud::ConstPtr frame;                    ///< Deskewed points for state estimation

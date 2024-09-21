@@ -66,7 +66,7 @@ public:
       init_v_world_imu = Eigen::Vector3d::Zero();
       force_init = true;
       std::cout << "zero:\n" << zero << std::endl;
-      initial_pose();
+      return initial_pose();
   };
 
   void set_init_state(const Eigen::Isometry3d& init_T_world_imu, const Eigen::Vector3d& init_v_world_imu);
