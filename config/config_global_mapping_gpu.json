@@ -10,9 +10,9 @@
   // isam2_relinearize_thresh       : Relinearization is performed only when linear delta gets larger than this
   */
   "global_mapping": {
-    "so_name": "",
+    "so_name": "libglobal_mapping.so",
     "enable_imu": false,
-    "enable_optimization": false,
+    "enable_optimization": true,
     "init_pose_damping_scale": 1e10,
     // Relative pose factors
     "create_between_factors": false,

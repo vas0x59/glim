@@ -38,7 +38,7 @@
 //     "estimate_gkv_pose": true,
     "estimate_gkv_pose": false,
     "init_using_gkv" : false,
-    "use_gkv" : true,
+    "use_gkv" : false,
     
 
     // Voxel params
@@ -48,7 +48,7 @@
     "full_connection_window_size": 2,
     // Keyframe params
     "keyframe_update_strategy": "OVERLAP",
-    "max_num_keyframes": 15,
+    "max_num_keyframes": 70,
     "keyframe_min_overlap": 0.01,
     "keyframe_max_overlap": 0.7,
     "keyframe_delta_trans": 2.0,
