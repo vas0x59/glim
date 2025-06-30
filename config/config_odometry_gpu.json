@@ -25,6 +25,7 @@
     // Initialization params
     "initialization_mode": "NAIVE",
     "init_T_world_imu" : [3.119840259103083, -0.00020202908322006585, 2.1870514885070476, -0.0025864580383406703, 0.10288427914772129, -0.00025516553101404444, 0.9946899367288388],
+    // "init_T_world_imu" : [1.228949, 0.000000, 1.728860, 0, 0, 0, 1],
     // "init_v_world_imu" : [0, 0, 0],
     "initialization_window_size": 1.0,
     "init_pose_damping_scale": 1e10,
@@ -37,7 +38,8 @@
 
 //     "estimate_gkv_pose": true,
     "estimate_gkv_pose": false,
-    "init_using_gkv" : true,
+    "init_using_gkv" : false,
+    // "init_using_gkv" : false,
     "use_gkv" : false,
     
 

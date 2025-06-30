@@ -1,6 +1,7 @@
 {
   "glim_ros": {
     // Backend modules
+    "enable_sub_mapping": false,
     "enable_local_mapping": false,
     "enable_global_mapping": false,
     // Points config
@@ -12,13 +13,18 @@
     "extension_modules": [
 //      "libmemory_monitor.so",
       "libstandard_viewer.so",
-      "librviz_viewer.so",
-      "libgkv_global.so"
+      "librviz_viewer.so"
+      // "libflat_earther.so",
+      // "libgkv_global.so"
+      // "libscan_context_loop_detector.so"
+
       // "libimu_validator.so"
     ],
     // Topics
     "imu_topic": "/ouster_top/imu",
-    "points_topic": "/joined_point_cloud_raw",
+    // "points_topic": "/joined_point_cloud_raw",
+    "points_topic": "/ouster_top/points",
+    
     "image_topic": "/image",
     "gkv_topic" : "/gkv_switched/odom"
   }
